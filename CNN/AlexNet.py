@@ -2,9 +2,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 
-print 'j'
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
-
 
 def _variable_on_cpu(name, shape, initializer):
     """Helper to create a Variable stored on CPU memory.
@@ -62,6 +60,8 @@ def inference(image, Batch_size, NUM_CLASSES):
         bias = tf.nn.bias_add(conv, biases)
         conv1 = tf.nn.relu(bias, name=scope)
 
+        tf.summary.histogram('conv1/kernel', kernel)
+
         parameter += [kernel, biases]
 
     pool1 = tf.nn.max_pool(conv1,
@@ -80,6 +80,7 @@ def inference(image, Batch_size, NUM_CLASSES):
         bias = tf.nn.bias_add(conv, biases)
         conv2 = tf.nn.relu(bias, name=scope)
 
+        tf.summary.histogram('conv2/kernel', kernel)
         parameter += [kernel, biases]
 
     pool2 = tf.nn.max_pool(conv2, ksize=[1, 3, 3, 1],
@@ -181,42 +182,46 @@ def time_tensorflow_run(sess, target, info_string, feed_dict):
     sess.run(target, feed_dict=feed_dict)
 
 
-images = tf.placeholder('float',shape=[None, 28, 28, 1])
-y = tf.placeholder('float', shape=[None, 10])
+images = tf.placeholder('float',shape=[None, 28, 28, 1], name="input_x")
+y = tf.placeholder('float', shape=[None, 10], name="input_y")
 
-for i in xrange(100):
-    batch = mnist.train.next_batch(50)
+batch = mnist.train.next_batch(50)
+image = np.array(list(batch[0]))
 
-    image = np.array(list(batch[0]))
+image = np.reshape(image, [-1, 28, 28, 1])
+#image = tf.image.resize_images(image, [227, 227])
 
-    image = np.reshape(image, [-1, 28, 28, 1])
-    #image = tf.image.resize_images(image, [227, 227])
-    #print image
-    feed_dict = {
-        images : image,
-        y: batch[1]
-    }
-    #print images
-    fc8, parameter = inference(images, 50, 10)
+feed_dict = {
+    images : image,
+    y: batch[1]
+}
 
-    init = tf.global_variables_initializer()
+fc8, parameter = inference(images, 50, 10)
 
-    sess = tf.Session()
-    sess.run(init)
+fc8_softmax = tf.nn.softmax(fc8)
+with tf.name_scope('loss'):
+    objective = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(fc8_softmax, y))
+    tf.summary.scalar("objective", objective)
 
-
-    time_tensorflow_run(sess, fc8, 'Forward', feed_dict)
-
-    fc8_softmax = tf.nn.softmax(fc8)
-    objective = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(fc8_softmax, batch[1]))
-
+with tf.name_scope('grad'):
     grad = tf.gradients(objective, parameter)
 
-    print time_tensorflow_run(sess, grad, 'Forward-backward', feed_dict)
+with tf.name_scope('train'):
+    train_step = tf.train.GradientDescentOptimizer(10).minimize(objective)
 
-    print 'loss', sess.run(objective, feed_dict)
+sess = tf.Session()
+sess.run(tf.global_variables_initializer())
 
+merged = tf.summary.merge_all()
+writer = tf.summary.FileWriter("logs/", sess.graph)
 
+for i in xrange(3):
+    sess.run(train_step, feed_dict=feed_dict)
+    print 'loss', sess.run(objective, feed_dict=feed_dict)
+    print 'k1', sess.run(parameter[0], feed_dict=feed_dict)
+    print 'gradient', sess.run(grad, feed_dict=feed_dict)
+    result = sess.run(merged, feed_dict=feed_dict)
+    writer.add_summary(result, i)
 
 
 
