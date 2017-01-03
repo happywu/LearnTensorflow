@@ -82,12 +82,14 @@ def CNN():
     keep_prob = tf.placeholder(tf.float32)
     h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
-    for i in xrange(100):
+    for i in xrange(500):
         batch = mnist.train.next_batch(50)
         #train_step.run(feed_dict={x: batch[0], y_:batch[1],keep_prob:0.5})
         sess.run(train_step,feed_dict={x: batch[0], y_:batch[1],keep_prob:0.5})
-        train_accuracy = sess.run(accuracy, feed_dict={x: batch[0], y_:batch[1],keep_prob:0.5})
-        print 'train_accuracy ', train_accuracy
+        if (i%50==0):
+            train_accuracy = sess.run(accuracy, feed_dict={x: batch[0], y_:batch[1],keep_prob:0.5})
+            loss = sess.run(cross_entropy, feed_dict={x:batch[0], y_:batch[1], keep_prob:0.5})
+            print 'train_accuracy ', train_accuracy, 'loss ', loss
 
 CNN()
 
